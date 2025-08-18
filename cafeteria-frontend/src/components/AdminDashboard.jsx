@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -87,9 +88,28 @@ const AdminDashboard = () => {
 
 
 
+const updateOrderStatus = async (orderId, newStatus, notes = '') => {
+  setUpdating(prev => ({ ...prev, [orderId]: true }))
+  try {
+    const token = localStorage.getItem("token");
+    await axios.put(`http://localhost:8000/api/orders/${orderId}/status`, 
+      { status: newStatus, notes },
+      { headers: { 
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }}
+    );
+    await fetchAllOrders()
+    setError('')
+  } catch (error) {
+    console.error('Error updating order status:', error)
+    setError('Failed to update order status')
+  } finally {
+    setUpdating(prev => ({ ...prev, [orderId]: false }))
+  }
+}
 
 
-  
   // Fixed syntax - added parentheses and semicolons
   const activeOrders = orders.filter(order =>
     ['pending', 'preparing', 'ready_for_pickup'].includes(order.status));
