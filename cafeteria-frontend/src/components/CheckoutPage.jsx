@@ -10,6 +10,20 @@ export default function CheckoutPage() {
   const { token } = useAuth();
   const [loading, setLoading] = useState(false);
   const [cart, setCart] = useState([]);
+  // Helper: Parse pickup time stored in localStorage
+  const parsePickupTimeFromStorage = () => {
+    try {
+      const stored = localStorage.getItem("pickupTime")
+      if (!stored) return null
+      const [hh, mm] = stored.split(":").map(Number)
+      if (Number.isNaN(hh) || Number.isNaN(mm)) return null
+      const now = new Date()
+      const dt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hh, mm, 0, 0)
+      return dt.toISOString()
+    } catch (e) {
+      return null
+    }
+  }
 
   useEffect(() => {
     if (contextCart && contextCart.length > 0) {
@@ -55,7 +69,7 @@ export default function CheckoutPage() {
     priceAtOrder: Number(item.price)
   })),
   totalPrice: Number(totalPrice.toFixed(2)),
-  pickupTime: new Date(Date.now() + 30 * 60000).toISOString()
+  pickupTime: parsePickupTimeFromStorage() || new Date(Date.now() + 30 * 60000).toISOString(),
 };
 
 await axios.post("http://localhost:8000/api/orders", payload, {
@@ -69,6 +83,7 @@ await axios.post("http://localhost:8000/api/orders", payload, {
       alert("Payment Successful! 🎉 Order placed.");
       clearCart();
       localStorage.removeItem("cart");
+      localStorage.removeItem("pickupTime");
       navigate("/orders");
     } catch (err) {
       console.error("Order error:", err.response?.data || err.message);

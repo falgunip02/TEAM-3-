@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { Label } from '@/components/ui/label' 
+import { Switch } from '@/components/ui/switch' 
 import { useAuth } from '../context/AuthContext'
 import API_ENDPOINTS from '../config/api'
 import { Button } from '@/components/ui/button'
@@ -15,7 +17,9 @@ import {
   Search,
   Filter,
   Clock,
-  DollarSign
+  DollarSign,
+  Trash,
+  Edit
 } from 'lucide-react'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
@@ -29,9 +33,18 @@ const MenuPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [cart, setCart] = useState([])
   const [showCart, setShowCart] = useState(false)
+  const [newItem, setNewItem] = useState({ 
+    name: "", 
+    description: "", 
+    price: "", 
+    category: "main",
+    imageUrl: "",
+    available: true
+  })
 
   const { user } = useAuth()
   const navigate = useNavigate()
+  const isManager = user?.role === "admin" || user?.role === "staff"
 
   // Restore cart from localStorage when page loads
   useEffect(() => {
@@ -90,46 +103,18 @@ const MenuPage = () => {
     setFilteredItems(filtered)
   }
 
-  // const addToCart = (item) => {
-  //   const existingItem = cart.find(cartItem => cartItem.id === item.id)
-  //   if (existingItem) {
-  //     setCart(cart.map(cartItem =>
-  //       cartItem.id === item.id
-  //         ? { ...cartItem, quantity: cartItem.quantity + 1 }
-  //         : cartItem
-  //     ))
-  //   } else {
-  //     setCart([...cart, { ...item, quantity: 1 }])
-  //   }
-  // }
-
-const addToCart = (item) => {
-  const existingItem = cart.find(cartItem => cartItem.menuItemId === item.id);
-  if (existingItem) {
-    setCart(cart.map(cartItem =>
-      cartItem.menuItemId === item.id
-        ? { ...cartItem, quantity: cartItem.quantity + 1 }
-        : cartItem
-    ));
-  } else {
-    setCart([...cart, { ...item, id: item.id, menuItemId: item.id, quantity: 1 }]);
-  }
-};
-
-
-//   const addToCart = (item) => {
-//   const existingItem = cart.find(cartItem => cartItem.menuItemId === item.id);
-//   if (existingItem) {
-//     setCart(cart.map(cartItem =>
-//       cartItem.menuItemId === item.id
-//         ? { ...cartItem, quantity: cartItem.quantity + 1 }
-//         : cartItem
-//     ));
-//   } else {
-//     // Store menuItemId explicitly
-//     setCart([...cart, { ...item, menuItemId: item.id, quantity: 1 }]);
-//   }
-// };
+  const addToCart = (item) => {
+    const existingItem = cart.find(cartItem => cartItem.menuItemId === item.id);
+    if (existingItem) {
+      setCart(cart.map(cartItem =>
+        cartItem.menuItemId === item.id
+          ? { ...cartItem, quantity: cartItem.quantity + 1 }
+          : cartItem
+      ));
+    } else {
+      setCart([...cart, { ...item, id: item.id, menuItemId: item.id, quantity: 1 }]);
+    }
+  };
 
   const removeFromCart = (itemId) => {
     const existingItem = cart.find(cartItem => cartItem.id === itemId)
@@ -153,11 +138,52 @@ const addToCart = (item) => {
   }
 
   const handleCheckout = () => {
-    // Save cart and total to localStorage
     localStorage.setItem("cart", JSON.stringify(cart))
     localStorage.setItem("cartTotal", getCartTotal())
     navigate('/checkoutpage')
   }
+
+  // Delete
+const handleDeleteItem = async (itemId) => {
+  try {
+    await axios.delete(API_ENDPOINTS.menu.delete(itemId)); 
+    setMenuItems(prev => prev.filter(item => item._id !== itemId));
+  } catch (error) {
+    console.error("Delete failed:", error);
+    setError("Failed to delete item");
+  }
+};
+
+// Add
+const handleAddItem = async (e) => {
+  e.preventDefault();
+  try {
+    const payload = { ...newItem, price: Number(newItem.price) };
+    const { data } = await axios.post(API_ENDPOINTS.menu.add, payload); // ✅
+    setMenuItems(prev => [...prev, data]);
+    setNewItem({ name: "", description: "", price: "", category: "main", imageUrl: "", available: true });
+  } catch (error) {
+    console.error("Add failed:", error);
+    setError("Failed to add item");
+  }
+};
+
+// Toggle availability (PUT full object)
+const toggleAvailability = async (itemId, currentStatus) => {
+  try {
+    const existing = menuItems.find(i => i._id === itemId);
+    if (!existing) return;
+
+    const payload = { ...existing, available: !currentStatus };
+    const { data } = await axios.put(API_ENDPOINTS.menu.update(itemId), payload); // ✅ PUT with full object
+    setMenuItems(prev => prev.map(i => (i._id === itemId ? data : i)));
+  } catch (error) {
+    console.error("Toggle availability failed:", error);
+    setError("Failed to update availability");
+  }
+};
+
+
 
   const categories = ['all', 'main', 'side', 'drink', 'dessert']
 
@@ -199,6 +225,96 @@ const addToCart = (item) => {
           </Alert>
         )}
 
+        {/* Add New Item Form (Admin/Staff only) */}
+        {isManager && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Add New Menu Item</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleAddItem} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>name</Label>
+                  <Input 
+                    placeholder="Item name" 
+                    value={newItem.name} 
+                    onChange={(e) => setNewItem({...newItem, name: e.target.value})} 
+                    required 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  <Select 
+                    value={newItem.category} 
+                    onValueChange={(value) => setNewItem({...newItem, category: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="main">Main</SelectItem>
+                      <SelectItem value="side">Side</SelectItem>
+                      <SelectItem value="drink">Drink</SelectItem>
+                      <SelectItem value="dessert">Dessert</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Price</Label>
+                  <Input 
+                    type="number" 
+                    step="0.01" 
+                    placeholder="Price" 
+                    value={newItem.price} 
+                    onChange={(e) => setNewItem({...newItem, price: e.target.value})} 
+                    required 
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Description</Label>
+                  <Input 
+                    placeholder="Description" 
+                    value={newItem.description} 
+                    onChange={(e) => setNewItem({...newItem, description: e.target.value})} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Image URL</Label>
+                  <Input 
+                    placeholder="Image URL" 
+                    value={newItem.imageUrl} 
+                    onChange={(e) => setNewItem({...newItem, imageUrl: e.target.value})} 
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <Switch 
+                    checked={newItem.available} 
+                    onCheckedChange={(val) => setNewItem({...newItem, available: val})} 
+                  />
+                  <span>Available</span>
+                </div>
+                <div className="md:col-span-3 flex gap-3">
+                  <Button type="submit">Add Item</Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setNewItem({ 
+                      name: "", 
+                      description: "", 
+                      price: "", 
+                      category: "main",
+                      imageUrl: "",
+                      available: true
+                    })}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Search and Filter */}
         <div className="flex flex-col md:flex-row gap-4 mb-8">
           <div className="relative flex-1">
@@ -223,7 +339,7 @@ const addToCart = (item) => {
               <SelectItem value="dessert">Desserts</SelectItem>
             </SelectContent>
           </Select>
-          {user && (
+          {user && !isManager && (
             <Button
               variant="outline"
               onClick={() => setShowCart(!showCart)}
@@ -259,8 +375,11 @@ const addToCart = (item) => {
                           key={item.id}
                           item={item}
                           onAddToCart={addToCart}
+                          onDelete={handleDeleteItem}
+                          onToggleAvailability={toggleAvailability}
                           cartItem={cart.find(cartItem => cartItem.id === item.id)}
                           user={user}
+                          isManager={isManager}
                         />
                       ))}
                     </div>
@@ -274,16 +393,19 @@ const addToCart = (item) => {
                     key={item.id}
                     item={item}
                     onAddToCart={addToCart}
+                    onDelete={handleDeleteItem}
+                    onToggleAvailability={toggleAvailability}
                     cartItem={cart.find(cartItem => cartItem.id === item.id)}
                     user={user}
+                    isManager={isManager}
                   />
                 ))}
               </div>
             )}
           </div>
 
-          {/* Cart Sidebar */}
-          {user && showCart && (
+          {/* Cart Sidebar (only for non-managers) */}
+          {user && !isManager && showCart && (
             <div className="lg:col-span-1">
               <Card className="sticky top-4">
                 <CardHeader>
@@ -326,6 +448,31 @@ const addToCart = (item) => {
                           </div>
                         </div>
                       ))}
+                      {/* Pickup Time Dropdown */}
+                      <div className="mt-4">
+                        <label className="block mb-2 font-medium">Schedule Pickup Time</label>
+                        <Select
+                          onValueChange={(value) => {
+                            try {
+                              localStorage.setItem("pickupTime", value)
+                            } catch (e) {
+                              console.error("Failed to save pickupTime", e)
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="w-[200px]">
+                            <SelectValue placeholder="Select time" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="10:00">10:00 AM</SelectItem>
+                            <SelectItem value="11:00">11:00 AM</SelectItem>
+                            <SelectItem value="12:00">12:00 PM</SelectItem>
+                            <SelectItem value="13:00">1:00 PM</SelectItem>
+                            <SelectItem value="14:00">2:00 PM</SelectItem>
+                            <SelectItem value="15:00">3:00 PM</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <div className="border-t pt-4">
                         <div className="flex justify-between items-center font-semibold">
                           <span>Total:</span>
@@ -347,7 +494,15 @@ const addToCart = (item) => {
   )
 }
 
-const MenuItemCard = ({ item, onAddToCart, cartItem, user }) => {
+const MenuItemCard = ({ 
+  item, 
+  onAddToCart, 
+  onDelete, 
+  onToggleAvailability,
+  cartItem, 
+  user,
+  isManager
+}) => {
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
       <div className="aspect-video bg-gradient-to-br from-primary/10 to-secondary/10 flex items-center justify-center">
@@ -382,15 +537,36 @@ const MenuItemCard = ({ item, onAddToCart, cartItem, user }) => {
           </div>
           {user && (
             <div className="flex items-center space-x-2">
-              {cartItem && (
-                <span className="text-sm text-muted-foreground">
-                  {cartItem.quantity} in cart
-                </span>
+              {isManager ? (
+                <>
+                  <Button 
+                    size="sm" 
+                    variant={item.available ? "default" : "secondary"}
+                    onClick={() => onToggleAvailability(item.id, item.available)}
+                  >
+                    {item.available ? "Available" : "Unavailable"}
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="destructive" 
+                    onClick={() => onDelete(item.id)}
+                  >
+                    <Trash className="w-4 h-4" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {cartItem && (
+                    <span className="text-sm text-muted-foreground">
+                      {cartItem.quantity} in cart
+                    </span>
+                  )}
+                  <Button onClick={() => onAddToCart(item)}>
+                    <Plus className="w-4 h-4 mr-1" />
+                    Add
+                  </Button>
+                </>
               )}
-              <Button onClick={() => onAddToCart(item)}>
-                <Plus className="w-4 h-4 mr-1" />
-                Add
-              </Button>
             </div>
           )}
         </div>

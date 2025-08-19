@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Button } from '@/components/ui/button'
-import { 
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -17,6 +17,10 @@ const Header = () => {
     logout()
     navigate('/')
   }
+
+  const role = (user?.role || '').toLowerCase()
+  const isStaffOrAdmin = role === 'staff' || role === 'admin'
+  const isEmployee = role === 'employee'
 
   return (
     <header className="bg-white shadow-sm border-b">
@@ -34,31 +38,21 @@ const Header = () => {
 
           {/* Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
-            <Link 
-              to="/" 
-              className="text-gray-700 hover:text-primary transition-colors"
-            >
-              Home
-            </Link>
-            <Link 
-              to="/menu" 
-              className="text-gray-700 hover:text-primary transition-colors"
-            >
-              Menu
-            </Link>
-            {user && (
-              <Link 
-                to="/orders" 
-                className="text-gray-700 hover:text-primary transition-colors"
-              >
+            <Link to="/" className="text-gray-700 hover:text-primary transition-colors">Home</Link>
+
+            {/* Both roles still go to /menu; staff/admin will see AdminMenu automatically */}
+            <Link to="/menu" className="text-gray-700 hover:text-primary transition-colors">Menu</Link>
+
+            {/* My Orders ONLY for employees */}
+            {user && isEmployee && (
+              <Link to="/orders" className="text-gray-700 hover:text-primary transition-colors">
                 My Orders
               </Link>
             )}
-            {user && user.role === 'staff' && (
-              <Link 
-                to="/admin" 
-                className="text-gray-700 hover:text-primary transition-colors"
-              >
+
+            {/* Admin link ONLY for staff/admin */}
+            {user && isStaffOrAdmin && (
+              <Link to="/admin" className="text-gray-700 hover:text-primary transition-colors">
                 Admin
               </Link>
             )}
@@ -79,16 +73,23 @@ const Header = () => {
                     <Settings className="w-4 h-4 mr-2" />
                     Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/orders')}>
-                    <ShoppingCart className="w-4 h-4 mr-2" />
-                    My Orders
-                  </DropdownMenuItem>
-                  {user.role === 'staff' && (
+
+                  {/* My Orders — employees only */}
+                  {isEmployee && (
+                    <DropdownMenuItem onClick={() => navigate('/orders')}>
+                      <ShoppingCart className="w-4 h-4 mr-2" />
+                      My Orders
+                    </DropdownMenuItem>
+                  )}
+
+                  {/* Admin — staff/admin only */}
+                  {isStaffOrAdmin && (
                     <DropdownMenuItem onClick={() => navigate('/admin')}>
                       <Settings className="w-4 h-4 mr-2" />
                       Admin Dashboard
                     </DropdownMenuItem>
                   )}
+
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="w-4 h-4 mr-2" />
                     Logout
@@ -97,12 +98,8 @@ const Header = () => {
               </DropdownMenu>
             ) : (
               <div className="flex items-center space-x-2">
-                <Button variant="ghost" onClick={() => navigate('/login')}>
-                  Login
-                </Button>
-                <Button onClick={() => navigate('/register')}>
-                  Sign Up
-                </Button>
+                <Button variant="ghost" onClick={() => navigate('/login')}>Login</Button>
+                <Button onClick={() => navigate('/register')}>Sign Up</Button>
               </div>
             )}
           </div>
@@ -113,4 +110,3 @@ const Header = () => {
 }
 
 export default Header
-

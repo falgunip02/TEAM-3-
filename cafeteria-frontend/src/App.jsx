@@ -1,5 +1,4 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
 import './App.css'
 
 // Components
@@ -13,27 +12,21 @@ import RegisterPage from './components/RegisterPage'
 import ProfilePage from './components/ProfilePage'
 import AdminDashboard from './components/AdminDashboard'
 import CheckoutPage from './components/CheckoutPage'
-import StaffOrderManagement from './components/StaffOrderManagement' // you need to import this
+import StaffOrderManagement from './components/StaffOrderManagement'
 
 // Context
 import { AuthProvider, useAuth } from './context/AuthContext'
 
-// Protected Route Component
-const ProtectedRoute = ({ children, requireStaff = false }) => {
+// Route guard with role control
+const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth()
-
-  if (loading) {
-    return <div className="flex justify-center items-center min-h-screen">Loading...</div>
+  if (loading) return <div className="flex justify-center items-center min-h-screen">Loading...</div>
+  if (!user) return <Navigate to="/login" />
+  if (Array.isArray(allowedRoles) && allowedRoles.length > 0) {
+    const role = (user.role || '').toLowerCase()
+    const allowed = allowedRoles.map(r => r.toLowerCase())
+    if (!allowed.includes(role)) return <Navigate to="/" />
   }
-
-  if (!user) {
-    return <Navigate to="/login" />
-  }
-
-  if (requireStaff && user.role !== 'staff') {
-    return <Navigate to="/" />
-  }
-
   return children
 }
 
@@ -45,17 +38,24 @@ function AppContent() {
         <main className="flex-1">
           <Routes>
             <Route path="/" element={<HomePage />} />
+
+            {/* Single menu page that adapts based on user role */}
             <Route path="/menu" element={<MenuPage />} />
+
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+
+            {/* My Orders — ONLY employees */}
             <Route
               path="/orders"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['employee']}>
                   <OrderPage />
                 </ProtectedRoute>
               }
             />
+
+            {/* Profile — accessible to all authenticated users */}
             <Route
               path="/profile"
               element={
@@ -64,26 +64,32 @@ function AppContent() {
                 </ProtectedRoute>
               }
             />
+
+            {/* Admin dashboard — staff + admin */}
             <Route
               path="/admin"
               element={
-                <ProtectedRoute requireStaff={true}>
+                <ProtectedRoute allowedRoles={['staff', 'admin']}>
                   <AdminDashboard />
                 </ProtectedRoute>
               }
             />
+
+            {/* Staff order management — staff + admin */}
             <Route
               path="/staff/orders"
               element={
-                <ProtectedRoute requireStaff={true}>
+                <ProtectedRoute allowedRoles={['staff', 'admin']}>
                   <StaffOrderManagement />
                 </ProtectedRoute>
               }
             />
+
+            {/* Checkout — only for employees */}
             <Route
               path="/checkoutpage"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['employee']}>
                   <CheckoutPage />
                 </ProtectedRoute>
               }
@@ -96,12 +102,10 @@ function AppContent() {
   )
 }
 
-function App() {
+export default function App() {
   return (
     <AuthProvider>
       <AppContent />
     </AuthProvider>
   )
 }
-
-export default App
